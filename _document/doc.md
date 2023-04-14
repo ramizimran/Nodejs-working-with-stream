@@ -113,3 +113,164 @@ try {
   console.log(error);
 }
 ```
+
+## Readable Streams | `fs.createWriteStream()`,`stream.write()`
+
+- event | properties | method
+
+### `stream.on(data,(chunk))`
+
+```javascript
+stream.on("data", (chunk) => {
+  console.log(chunk.toString());
+});
+```
+
+### `stream.on('end')`
+
+`end` event is emitted when there is no more data to read.
+
+```javascript
+stream.on("end", () => {
+  console.log("No more data to read");
+});
+```
+
+```javascript
+import fs from "node:fs/promises";
+
+try {
+  const fileHandle = await fs.open("file.txt", "r");
+  const stream = await fileHandle.createReadStream({
+    highWaterMark: 64 * 1024,
+  });
+
+  // check if stream is readable
+  console.log(stream.readable);
+  // highWaterMark is 64kb
+  console.log(stream.readableHighWaterMark);
+
+  stream.on("data", (chunk) => {
+    console.log(chunk);
+    // type of chunk is Buffer
+    console.log(chunk instanceof Buffer);
+    // length of chunk is 64kb
+    console.log(chunk.length);
+  });
+
+  stream.on("end", () => {
+    console.log("end");
+    // close file
+    fileHandle.close();
+  });
+} catch (error) {
+  console.log(error);
+}
+```
+
+### `stream.pause()` and `stream.resume()`
+
+`stream.pause()` method is used to pause the stream.
+
+`stream.resume()` method is used to resume the stream.
+
+`stream.on('end')` event is emitted when there is no more data to read. it will trigger when the stream is finished reading.
+
+```javascript
+try {
+  const readFileHandle = await fs.open("read.txt", "r");
+  const writeFileHandle = await fs.open("write.txt", "w");
+  const readStream = await readFileHandle.createReadStream({
+    highWaterMark: 64 * 1024,
+  });
+  const writeStream = await writeFileHandle.createWriteStream();
+
+  readStream.on("data", (chunk) => {
+    // check writeStream is writable if not then pause readStream
+    if (!writeStream.write(chunk)) {
+      readStream.pause();
+    }
+  });
+
+  // wait for drain event and continue reading
+  writeStream.on("drain", () => {
+    readStream.resume();
+  });
+
+  readStream.on("end", () => {
+    readFileHandle.close();
+    writeFileHandle.close();
+  });
+} catch (error) {
+  console.log(error);
+}
+```
+
+### `Two modes`
+
+- Flowing mode
+- Paused mode
+
+all Readable streams start in paused mode but can be switched to flowing mode in one of the following ways:
+
+- Adding a 'data' event handler.
+- Calling the `stream.resume()` method.
+- Calling the `stream.pipe()` method to send the data to a `Writable`.
+- `stream.pause()` method is used to pause the stream.
+
+#### `Three states`'
+
+- `readable.readableFlowing === null` : The stream is in paused mode.
+- `readable.readableFlowing === false` : The stream is in paused mode.
+- `readable.readableFlowing === true` : The stream is in flowing mode.
+
+## Choose one API style
+
+- `stream.on('data', function(chunk) {})`
+- `stream.on('readable', function() {})`
+- `stream.pipe(destination[, options])`
+-
+
+### `stream.on('data', function(chunk) {})`
+
+```javascript
+try {
+  const readable = await fs.open("read.txt", "r");
+  const x = await readable.createReadStream();
+  console.log(x.readable);
+  x.on("data", (chunk) => {
+    console.log(chunk.toString("utf-8"));
+  });
+  x.on("end", () => {
+    console.log("end");
+    readable.close();
+  });
+} catch (error) {
+  console.log(error);
+}
+```
+
+### `stream.on('readable', function() {})`
+
+```javascript
+try {
+  const readable = await fs.open("read.txt", "r");
+  const x = await readable.createReadStream();
+  x.on("readable", () => {
+    let chunk;
+
+    // console.log("readable", x.read());
+    // console.log("readable", typeof x.read());
+
+    while ((chunk = x.read()) !== null) {
+      console.log(chunk.toString("utf-8"));
+    }
+  });
+  x.on("end", () => {
+    console.log("end");
+    readable.close();
+  });
+} catch (error) {
+  console.log(error);
+}
+```
