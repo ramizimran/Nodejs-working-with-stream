@@ -274,3 +274,109 @@ try {
   console.log(error);
 }
 ```
+
+### `stream.pipe(destination[, options])`
+
+**Nodejs will handle all the `pause`, `drain` and `resume` events.**
+
+- `close` - emitted when the writable stream is closed
+- `drain` - emitted when the writable stream is drained - and can receive more data
+- `error` - emitted when an error occurs during piping
+- `finish` - emitted when all data has been written to the writable stream
+
+```javascript
+try {
+  try {
+    const copy_to = await fs.open("to-write.txt", "w");
+    const copy_from = await fs.open("from-read.txt", "r");
+
+    const readStream = copy_from.createReadStream();
+    const writStream = copy_to.createWriteStream();
+
+    readStream.pipe(writStream);
+
+    readStream.on("end", () => {
+      console.log("copy end");
+    });
+
+    readStream.on("error", (error) => {
+      readStream.destroy();
+    });
+  } catch (error) {
+    console.log(error);
+  }
+} catch (error) {
+  console.log(error);
+}
+```
+
+### `readable.unpipe(destination[, options])`
+
+### `stream.finished(stream[, options], callback)`
+
+### `pipeline()`
+
+In Node.js, the pipeline() method is used to transfer data between multiple streams, typically a readable stream, one or more transform streams, and a writable stream. The pipeline() method makes it easy to pipe multiple streams together and handle errors.
+
+**Arguments**
+
+- `readableStream`: The source readable stream.
+- `transformStream1 ... transformStreamN`: Any number of transform streams to transform data before writing to the writable stream.
+- `writableStream`: The destination writable stream.
+- `options (optional)`: An object with optional properties that can be used to customize the behavior of the pipeline.
+- `callback (optional)`: A function that will be called once the pipeline has completed or an error occurs.
+
+```javascript
+try {
+  const copy_to = await fs.open("to-write.txt", "w");
+  const copy_from = await fs.open("from-read.txt", "r");
+
+  const readStream = copy_from.createReadStream();
+  const writStream = copy_to.createWriteStream();
+
+  await pipeline(readStream, writStream);
+} catch (error) {
+  console.log(error);
+} finally {
+  copy_to.close();
+  copy_from.close();
+}
+```
+
+````javascript
+const fs = require('fs');
+const { pipeline } = require('stream');
+const readableStream = fs.createReadStream('input.txt');
+const writableStream = fs.createWriteStream('output.txt');
+const transformStream = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();
+  }
+});
+pipeline(
+  readableStream,
+  transformStream,
+  writableStream,
+  (err) => {
+    if (err) {
+      console.error(`Error during pipeline: ${err}`);
+    } else {
+      console.log('Pipeline complete');
+    }
+  }
+);
+writableStream.on('close', () => {
+  console.log('Writable stream closed');
+});
+writableStream.on('drain', () => {
+  console.log('Writable stream drained');
+});
+writableStream.on('error', (err) => {
+  console.error(`Error writing to stream: ${err}`);
+});
+writableStream.on('finish', () => {
+  console.log('Finished writing to stream');
+});
+```
+````
