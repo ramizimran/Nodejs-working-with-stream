@@ -290,67 +290,128 @@ try {
 
 ## Readable Streams | `fs.createWriteStream()`,`stream.write()`
 
-- event | properties | method
+### `Two modes`
+
+- Flowing mode
+- Paused mode
+
+all Readable streams start in paused mode but can be switched to flowing mode in one of the following ways:
+
+### `Three states`'
+
+- `readable.readableFlowing === null` : The stream is in paused mode.
+- `readable.readableFlowing === false` : The stream is in paused mode.
+- `readable.readableFlowing === true` : The stream is in flowing mode.
+
+### Choose one API style
+
+- `stream.on('data', function(chunk) {})`
+- `stream.on('readable', function() {})`
+- `stream.pipe(destination[, options])`
+
+The main difference between `readable.on('data',(chunk)=>{})` and `readable.on('readable',()=>{})` is that the `data` event is emitted when there is data available to be read, while the `readable` event is emitted when data may be available to be read.
+
+_You should use `readable.on('data', function(chunk) {})` when you want to consume data as soon as it is available and you are able to process it efficiently. You should use `readable.on('readable', function() {})` when you want to check whether there is data available to be read, or if you need to perform some other action before consuming the data._
 
 ### **EVENTS**
 
-### `stream.on(data,(chunk))`
+- ### `stream.on('data', function(chunk) {})`
 
-```javascript
-stream.on("data", (chunk) => {
-  console.log(chunk.toString());
-});
-```
+  The `data` event is emitted when data is available to be consumed from the stream. When the `data` event is emitted, the callback function provided as the event listener is called with a `chunk` parameter, which represents a chunk of data that can be read from the stream. The `data` event is a simple way to consume data from a Readable stream, as it automatically handles buffering and flow control.
 
-### `stream.on('end')`
+  - Pros: This method will give you access to the data as soon as it is available, and you can consume it immediately. This is especially useful when dealing with large amounts of data, as it allows you to process it in chunks.
+  - Cons: This method can potentially cause back-pressure, as it will continue to emit data events until all the available data has been consumed. This can be problematic if you are processing the data slowly, as it can cause the buffer to fill up and the program to run out of memory.
 
-`end` event is emitted when there is no more data to read.
+  ```javascript
+  import fs from "node:fs/promises";
+  try {
+    const fileHandle = await fs.open("file.txt", "r");
+    const stream = await fileHandle.createReadStream({
+      highWaterMark: 64 * 1024,
+    });
 
-```javascript
-stream.on("end", () => {
-  console.log("No more data to read");
-});
-```
+    // check if stream is readable
+    console.log(stream.readable);
+    // highWaterMark is 64kb
+    console.log(stream.readableHighWaterMark);
 
-```javascript
-import fs from "node:fs/promises";
+    stream.on("data", (chunk) => {
+      console.log(chunk);
+      // type of chunk is Buffer
+      console.log(chunk instanceof Buffer);
+      // length of chunk is 64kb
+      console.log(chunk.length);
+    });
 
-try {
-  const fileHandle = await fs.open("file.txt", "r");
-  const stream = await fileHandle.createReadStream({
-    highWaterMark: 64 * 1024,
-  });
+    stream.on("end", () => {
+      console.log("end");
+      // close file
+      fileHandle.close();
+    });
+  } catch (error) {
+    console.log(error);
+  }
+  ```
 
-  // check if stream is readable
-  console.log(stream.readable);
-  // highWaterMark is 64kb
-  console.log(stream.readableHighWaterMark);
+- ### `stream.on('readable', function() {})`
 
-  stream.on("data", (chunk) => {
-    console.log(chunk);
-    // type of chunk is Buffer
-    console.log(chunk instanceof Buffer);
-    // length of chunk is 64kb
-    console.log(chunk.length);
-  });
+  The `readable` event, on the other hand, is emitted when there is data available to be read from the stream, but it does not guarantee that data is immediately available. The `readable` event is emitted when the stream transitions from a state of not having enough data to read to a state where data can be read. When the `readable` event is emitted, the stream's `read()` method can be called to read data from the stream. The `readable` event provides more control over the flow of data, as it allows the consumer to read data on demand, but it requires more complex handling of buffering and flow control.
 
+  - Pros: This method allows you to check whether there is data available to be read, without actually consuming it. This is useful if you want to read data only when it is needed, or if you need to perform some other action before consuming the data.
+  - Cons: This method may not provide access to the data immediately, as it only emits the event when data may be available to be read. This can be less efficient if you need to process the data quickly, as it may require multiple iterations of the event loop.
+
+  ```javascript
+  try {
+    const readable = await fs.open("read.txt", "r");
+    const x = await readable.createReadStream();
+    x.on("readable", () => {
+      let chunk;
+      // console.log("readable", x.read());
+      // console.log("readable", typeof x.read());
+      while ((chunk = x.read()) !== null) {
+        console.log(chunk.toString("utf-8"));
+      }
+    });
+    x.on("end", () => {
+      console.log("end");
+      readable.close();
+    });
+  } catch (error) {
+    console.log(error);
+  }
+  ```
+
+- ### `stream.on('end')`
+
+  `end` event is emitted when there is no more data to read. it will trigger when the stream is finished reading.
+
+  ```javascript
   stream.on("end", () => {
-    console.log("end");
-    // close file
-    fileHandle.close();
+    console.log("No more data to read");
   });
-} catch (error) {
-  console.log(error);
-}
-```
+  ```
 
-### `stream.pause()` and `stream.resume()`
+- ### `stream.on('pause')`
 
-`stream.pause()` method is used to pause the stream.
+  `pause` event is emitted when the stream is paused.
 
-`stream.resume()` method is used to resume the stream.
+  ```javascript
+  stream.on("pause", () => {
+    console.log("stream is paused");
+  });
+  ```
 
-`stream.on('end')` event is emitted when there is no more data to read. it will trigger when the stream is finished reading.
+- ### `stream.on('resume')`
+
+  `resume` event is emitted when the stream is resumed.
+
+  ```javascript
+  stream.on("resume", () => {
+    console.log("stream is resumed");
+  });
+  ```
+
+### EXAMPLE
 
 ```javascript
 try {
@@ -382,115 +443,127 @@ try {
 }
 ```
 
-### `Two modes`
+### **METHODS**
 
-- Flowing mode
-- Paused mode
+- ### `stream.pipe(destination[, options])`
 
-all Readable streams start in paused mode but can be switched to flowing mode in one of the following ways:
+  **Nodejs will handle all the `pause`, `drain` and `resume` events.**
 
-- Adding a 'data' event handler.
-- Calling the `stream.resume()` method.
-- Calling the `stream.pipe()` method to send the data to a `Writable`.
-- `stream.pause()` method is used to pause the stream.
+  The `readable.pipe(destination[, options])` method is a convenient way to quickly and easily transfer data from a readable stream to a writable stream. When called on a readable stream, it sets up a `pipe` between the readable stream and a writable `destination` stream, allowing data to flow seamlessly between them.
 
-#### `Three states`'
+  options:
 
-- `readable.readableFlowing === null` : The stream is in paused mode.
-- `readable.readableFlowing === false` : The stream is in paused mode.
-- `readable.readableFlowing === true` : The stream is in flowing mode.
+  - `data`: When the readable stream emits a `data` event, the data is written to the destination stream.
+  - `end`: When the readable stream emits an `end` event, the destination stream is ended if the `end` option is set to `true`.
+  - `error`: If an error occurs on either the readable or writable stream, the error is emitted on both streams.
 
-## Choose one API style
-
-- `stream.on('data', function(chunk) {})`
-- `stream.on('readable', function() {})`
-- `stream.pipe(destination[, options])`
--
-
-### `stream.on('data', function(chunk) {})`
-
-```javascript
-try {
-  const readable = await fs.open("read.txt", "r");
-  const x = await readable.createReadStream();
-  console.log(x.readable);
-  x.on("data", (chunk) => {
-    console.log(chunk.toString("utf-8"));
-  });
-  x.on("end", () => {
-    console.log("end");
-    readable.close();
-  });
-} catch (error) {
-  console.log(error);
-}
-```
-
-### `stream.on('readable', function() {})`
-
-```javascript
-try {
-  const readable = await fs.open("read.txt", "r");
-  const x = await readable.createReadStream();
-  x.on("readable", () => {
-    let chunk;
-
-    // console.log("readable", x.read());
-    // console.log("readable", typeof x.read());
-
-    while ((chunk = x.read()) !== null) {
-      console.log(chunk.toString("utf-8"));
-    }
-  });
-  x.on("end", () => {
-    console.log("end");
-    readable.close();
-  });
-} catch (error) {
-  console.log(error);
-}
-```
-
-### `stream.pipe(destination[, options])`
-
-**Nodejs will handle all the `pause`, `drain` and `resume` events.**
-
-- `close` - emitted when the writable stream is closed
-- `drain` - emitted when the writable stream is drained - and can receive more data
-- `error` - emitted when an error occurs during piping
-- `finish` - emitted when all data has been written to the writable stream
-
-```javascript
-try {
+  ```javascript
   try {
-    const copy_to = await fs.open("to-write.txt", "w");
-    const copy_from = await fs.open("from-read.txt", "r");
+    try {
+      const copy_to = await fs.open("to-write.txt", "w");
+      const copy_from = await fs.open("from-read.txt", "r");
 
-    const readStream = copy_from.createReadStream();
-    const writStream = copy_to.createWriteStream();
+      const readStream = copy_from.createReadStream();
+      const writStream = copy_to.createWriteStream();
 
-    readStream.pipe(writStream);
-
-    readStream.on("end", () => {
-      console.log("copy end");
-    });
-
-    readStream.on("error", (error) => {
-      readStream.destroy();
-    });
+      readStream.pipe(writStream);
+      readStream.on("end", () => {
+        console.log("copy end");
+      });
+      readStream.on("error", (error) => {
+        readStream.destroy();
+      });
+    } catch (error) {
+      console.log(error);
+    }
   } catch (error) {
     console.log(error);
   }
-} catch (error) {
-  console.log(error);
-}
+  ```
+
+- ### `readable.unpipe(destination[, options])`
+
+  The `readable.unpipe([destination])` method is used to stop piping data from a readable stream to a writable stream. If `destination` is specified, then only that destination is removed. If `destination` is not specified, then all destinations are removed.
+
+- ### `read(size)`
+
+  The `readable.read([size])` method pulls some data out of the internal buffer and returns it. If there is no data available, then it will return `null`.
+
+- ### `readable.setEncoding(encoding)`
+
+  The `readable.setEncoding(encoding)` method sets the encoding for the readable stream. This will cause the stream to emit strings rather than `Buffer` objects.
+
+- ### `readable.pause()`
+
+  The `readable.pause()` method pauses the stream. Any data that becomes available will remain in the internal buffer.
+
+- ### `readable.resume()`
+
+  The `readable.resume()` method resumes a paused stream.
+
+- ### `readable.isPaused()`
+
+  The `readable.isPaused()` method returns a boolean indicating whether the stream is paused or not.
+
+### EXAMPLE
+
+```javascript
+import fs from "node:fs";
+
+// Create a Readable stream from a file
+const readableStream = fs.createReadStream("file.txt");
+
+// Set the encoding to UTF-8
+readableStream.setEncoding("utf8");
+
+// Read the first 10 bytes of data from the stream
+const chunk = readableStream.read(10);
+
+// Pause the stream
+readableStream.pause();
+
+// Check if the stream is paused
+console.log(readableStream.isPaused()); // true
+
+// Resume the stream after a 1 second delay
+setTimeout(() => {
+  readableStream.resume();
+}, 1000);
 ```
 
-### `readable.unpipe(destination[, options])`
+### **PROPERTIES**
 
-### `stream.finished(stream[, options], callback)`
+- ### `readable.readable`
 
-### `pipeline()`
+  The `readable.readable` property is a boolean that indicates whether the stream is readable or not.
+
+- ### `readable.readableEncoding`
+
+  The `readable.readableEncoding` property is a string that indicates the encoding of the stream.
+
+- ### `readable.readableEnded`
+
+  `readable.readableEnded` property is a boolean that indicates whether the stream has ended or not.
+
+- ### `readable.readableFlowing`
+
+  The `readable.readableFlowing` property is a boolean that indicates whether the stream is flowing or not.
+
+- ### `readable.readableHighWaterMark`
+
+  The `readable.readableHighWaterMark` property is a number that indicates the high water mark of the stream.
+
+- ### `readable.readableLength`
+
+  The `readable.readableLength` property is a number that indicates the length of the stream.
+
+- ### `readable.readableObjectMode`
+
+  The `readable.readableObjectMode` property is a boolean that indicates whether the stream is in object mode or not.
+
+### **Utility Method**
+
+### `Pipeline()`
 
 In Node.js, the pipeline() method is used to transfer data between multiple streams, typically a readable stream, one or more transform streams, and a writable stream. The pipeline() method makes it easy to pipe multiple streams together and handle errors.
 
@@ -519,43 +592,37 @@ try {
 }
 ```
 
-````javascript
-const fs = require('fs');
-const { pipeline } = require('stream');
-const readableStream = fs.createReadStream('input.txt');
-const writableStream = fs.createWriteStream('output.txt');
+```javascript
+const fs = require("fs");
+const { pipeline } = require("stream");
+const readableStream = fs.createReadStream("input.txt");
+const writableStream = fs.createWriteStream("output.txt");
 const transformStream = new Transform({
   transform(chunk, encoding, callback) {
     this.push(chunk.toString().toUpperCase());
     callback();
+  },
+});
+pipeline(readableStream, transformStream, writableStream, (err) => {
+  if (err) {
+    console.error(`Error during pipeline: ${err}`);
+  } else {
+    console.log("Pipeline complete");
   }
 });
-pipeline(
-  readableStream,
-  transformStream,
-  writableStream,
-  (err) => {
-    if (err) {
-      console.error(`Error during pipeline: ${err}`);
-    } else {
-      console.log('Pipeline complete');
-    }
-  }
-);
-writableStream.on('close', () => {
-  console.log('Writable stream closed');
+writableStream.on("close", () => {
+  console.log("Writable stream closed");
 });
-writableStream.on('drain', () => {
-  console.log('Writable stream drained');
+writableStream.on("drain", () => {
+  console.log("Writable stream drained");
 });
-writableStream.on('error', (err) => {
+writableStream.on("error", (err) => {
   console.error(`Error writing to stream: ${err}`);
 });
-writableStream.on('finish', () => {
-  console.log('Finished writing to stream');
+writableStream.on("finish", () => {
+  console.log("Finished writing to stream");
 });
 ```
-````
 
 ## Custom WritableStream
 
