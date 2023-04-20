@@ -518,3 +518,93 @@ try {
   console.log(error);
 }
 ```
+
+## Custom ReadableStream `new stream.Readable([options])`
+
+**_options_**
+
+- `highWaterMark <number>` : default 16kb. The maximum number of bytes to store in the internal buffer before ceasing to read from the underlying resource.
+- `encoding <string>` : default `null`. If specified, then buffers will be decoded to strings using the specified encoding.
+- `objectMode <boolean>` : default `false`. If `true`, the stream will operate in object mode. In this mode, the stream will emit JavaScript objects rather than `Buffer` objects. The `encoding` option must not be set if `objectMode` is `true`.
+- `read <Function>` : default `null`. If specified, then the specified function will be used as the implementation of the stream's `read()` method, allowing the user to provide a custom implementation for reading chunks from the stream.
+- `destroy <Function>` : default `null`. If specified, then the specified function will be used as the implementation of the stream's `_destroy()` method, allowing the user to provide a custom implementation for destroying the stream.
+- `autoDestroy <boolean>` : default `true`. If `true`, then the stream will automatically call the `destroy()` method when the stream ends, and after the `'error'` event is emitted if no error handler is set. If `false`, then the stream will not automatically call the `destroy()` method, and it is the user's responsibility to manually call `stream.destroy()` in order to close the stream and release any underlying resources.
+- `emitClose <boolean>` : default `true`. If `true`, then the stream will emit a `'close'` event when the stream and any of its underlying resources (a file descriptor, for example) have been closed. If `false`, then the `'close'` event will not be emitted.
+
+- MUST IMPLEMENT THOSE SPECIFIC FUNCTIONS
+
+  - `_read()`
+  - `_destroy()`
+
+### `Class`: `Readable`
+
+### `readable._construct(callback)`
+
+`_construct()` is called during object construction. The `callback` must be called once the construction is complete.
+
+### `readable._read(size)` : MUST IMPLEMENT
+
+```javascript
+fs.read(this.fd, buff, 0, size, null, (err, bytesRead){}
+```
+
+`size <number>` Number of bytes to read asynchronously
+
+### `readable._destroy(error, callback)`
+
+### `readable.push(chunk[, encoding])`
+
+```javascript
+this.push(bytesRead > 0 ? buff.subarray(0, bytesRead) : null);
+```
+
+```javascript
+import fs from "node:fs";
+import { Readable } from "node:stream";
+
+class ReadEmAll extends Readable {
+  constructor({ highWaterMark, fileName }) {
+    super({ highWaterMark });
+    this.fileName = fileName;
+    this.fd = null;
+  }
+
+  _construct(callback) {
+    fs.open(this.fileName, "r", (err, fd) => {
+      if (err) return callback(err);
+      this.fd = fd;
+      callback();
+    });
+  }
+
+  _read(size) {
+    const buff = Buffer.alloc(size);
+    fs.read(this.fd, buff, 0, size, null, (err, bytesRead) => {
+      if (err) return this.destroy(err);
+      // null is to indicate the end of the stream
+      this.push(bytesRead > 0 ? buff.subarray(0, bytesRead) : null);
+    });
+  }
+
+  _destroy(error, callback) {
+    if (this.fd) {
+      fs.close(this.fd, (err) => callback(err || error));
+    } else {
+      callback(error);
+    }
+  }
+}
+
+const readStream = new ReadEmAll({
+  highWaterMark: 64,
+  fileName: "../_document/doc.md",
+});
+
+readStream.on("data", (chunk) => {
+  console.log(chunk.toString());
+});
+
+readStream.on("end", () => {
+  console.log("Done reading");
+});
+```
