@@ -25,12 +25,11 @@
 
 ## Writeable Streams | `fs.createWriteStream()`,`stream.write()`
 
-- event | properties | method
-- internal buffer | size 16kb
-- drain event
-
 - `stram.highWaterMark` : The `highWaterMark` property specifies the maximum number of bytes to store in the internal buffer before ceasing to read from the underlying resource. default value is 16kb.
 - `stream.writableLength` : The `writableLength` property specifies the number of bytes currently buffered to be written to the underlying system.
+- `stream.write()` : The `write()` method writes some data to the stream, and calls the supplied callback once the data has been fully handled. If the data is a string, it will be converted to a Buffer before writing. The callback will be called with a possible error argument if an error occurred while writing the data, or with the `chunk` as the second argument if the data was successfully written.
+- `stream.end()` : The `end()` method signals the end of the stream (EOF), after which no more data can be written to the stream. The optional `chunk` and `encoding` arguments allow one final additional chunk of data to be written immediately before closing the stream.
+- `stream.destroy()` : The `destroy()` method destroys the stream, making all future operations on the stream error. The optional `error` argument will be emitted as an `'error'` event if provided.
 
 ```javascript
 try {
@@ -47,39 +46,211 @@ try {
 }
 ```
 
-### `stream.on('drain')`
+### **EVENTS**
 
-`drain` event is emitted when the buffer is freed and ready to write more data.
+- ### `stream.on('drain')`
 
-```javascript
-stream.on("drain", () => {
-  console.log("Buffer is freed");
-});
-```
+  `drain` event is emitted when the buffer is freed and ready to write more data.
+  Emitted when the writable stream becomes writable again after a write operation drained the buffer.
 
-### `stream.end()`
+  ```javascript
+  import { createWriteStream } from "node:fs";
 
-`stream.end()` method is used to close the stream.
+  const writable = createWriteStream("./output.txt");
+  writable.on("drain", () => {
+    console.log("Writable stream is writable again");
+  });
+  ```
 
-### `stream.on('finish')`
+- ### `stream.on('finish')`
 
-`finish` event is emitted when the stream is closed.
+  `finish` event is emitted when the stream is closed.
+  Emitted when all data has been flushed to the underlying system.
 
-### `stream.on('close')`
+  ```javascript
+  import { createWriteStream } from "node:fs";
 
-`close` event is emitted when the stream and the file descriptor is closed.
+  const writable = createWriteStream("./output.txt");
+  writable.on("finish", () => {
+    console.log("All data has been flushed to the underlying system");
+  });
+  ```
 
-### `stream.on('error')`
+- ### `stream.on('close')`
 
-`error` event is emitted when there is an error while writing data.
+  `close` event is emitted when the stream and the file descriptor is closed.
+  Emitted when the writable stream and any underlying resources have been closed. The event indicates that no more events will be emitted, and no further computation will occur.
 
-### `stream.destroy()`
+  ```javascript
+  import { createWriteStream } from "node:fs";
 
-`stream.destroy()` method is used to destroy the stream.
+  const writable = createWriteStream("./output.txt");
+  writable.on("close", () => {
+    console.log("Writable stream closed");
+  });
+  ```
 
-### `stream.writable`
+- ### `stream.on('error')`
 
-`stream.writable` property is used to check whether the stream is writable or not.
+  `error` event is emitted when there is an error while writing data.
+
+  ```javascript
+  import { createWriteStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+  writable.on("error", (err) => {
+    console.log(err);
+  });
+  ```
+
+- ### `stream.on('pipe',(src)=>{})`
+
+  `pipe` event is emitted when the stream is piped to another stream.
+
+  - `src <stream.Readable>` source stream that is `piping` to this writable
+
+  ```javascript
+  import { createWriteStream, createReadStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+  const readable = createReadStream("./input.txt");
+
+  readable.pipe(writable);
+  writable.on("pipe", (source) => {
+    console.log("Piping from", source.path);
+  });
+  ```
+
+- ### `stream.on('unpipe')`
+
+  `unpipe` event is emitted when the stream is unpiped from another stream.
+
+  - `src <stream.Readable>` The source stream that `unpiped` this writable
+
+  ```javascript
+  import { createWriteStream, createReadStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+  const readable = createReadStream("./input.txt");
+
+  readable.pipe(writable);
+  writable.on("unpipe", (source) => {
+    console.log("Unpiping from", source.path);
+  });
+  readable.unpipe(writable);
+  ```
+
+### **METHODS**
+
+- ### `write(chunk[, encoding][, callback])`
+
+  `write` method is used to write data to the stream. Writes the given data to the writable stream. If the data is a string, it will be converted to a Buffer before writing.
+
+  - `chunk` `<string> | <Buffer> | <Uint8Array> | <any>` The data to write
+  - `encoding` `<string>` The encoding, if `chunk` is a string
+  - `callback` `<Function>` Callback for when this chunk of data is flushed
+
+  ```javascript
+  import { createWriteStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+  writable.write("Hello World", (err) => {
+    if (err) {
+      console.log(err);
+    }
+    console.log("Data written successfully");
+  });
+  ```
+
+- ### `end([chunk][, encoding][, callback])`
+
+  `end` method is used to signal that no more data will be written to the stream. The optional `chunk` and `encoding` arguments allow one final additional chunk of data to be written immediately before closing the stream.
+
+  - `chunk` `<string> | <Buffer> | <Uint8Array> | <any>` Optional data to write
+  - `encoding` `<string>` The encoding, if `chunk` is a string
+  - `callback` `<Function>` Callback for when this chunk of data is flushed
+
+  ```javascript
+  import { createWriteStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+
+  writable.write("Hello World", (err) => {
+    if (err) {
+      console.log(err);
+    }
+    console.log("Data written successfully");
+  });
+
+  writable.end("This is the end", (err) => {
+    if (err) {
+      console.log(err);
+    }
+    console.log("End written successfully");
+  });
+  ```
+
+- ### `setDefaultEncoding(encoding)`
+
+  `setDefaultEncoding` method is used to set the default encoding for a writable stream.
+
+  - `encoding` `<string>` The encoding
+
+  ```javascript
+  import { createWriteStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+
+  writable.setDefaultEncoding("utf8");
+  writable.write("Hello World");
+  ```
+
+- ### `setDefaultHighWaterMark(highWaterMark)`
+
+  `setDefaultHighWaterMark` method is used to set the default highWaterMark for a writable stream.
+
+  - `highWaterMark` `<number>` The new highWaterMark value
+
+  ```javascript
+  import { createWriteStream } from "node:fs";
+
+  const writable = createWriteStream("./output.txt");
+
+  writable.setDefaultHighWaterMark(100);
+  writable.write("Hello World");
+  ```
+
+### **PROPERTIES**
+
+- ### `writable.closed`
+
+  `writable.closed` property is used to check whether the stream is closed or not.
+
+  ```javascript
+  const isClosed = writable.closed;
+  console.log(isClosed);
+  ```
+
+- ### `writable.writable`
+
+  `writable.writable` property is used to check whether the stream is writable or not.
+
+  ```javascript
+  const isWritable = writable.writable;
+  console.log(isWritable);
+  ```
+
+- ### `writable.writableEnded`
+
+- ### `writable.writableFinished`
+
+- ### `writable.errored`
+
+- ### `writable.writableLength`
+
+  This property contains the number of bytes (or objects) in the queue ready to be written. The value provides introspection data regarding the status of the highWaterMark.
+
+### **EXAMPLE**
 
 ```javascript
 try {
@@ -100,6 +271,7 @@ try {
   };
 
   writeOnFile();
+
   stream.on("drain", () => {
     writeOnFile();
   });
@@ -114,9 +286,13 @@ try {
 }
 ```
 
+---
+
 ## Readable Streams | `fs.createWriteStream()`,`stream.write()`
 
 - event | properties | method
+
+### **EVENTS**
 
 ### `stream.on(data,(chunk))`
 
