@@ -1,5 +1,9 @@
 # Stream
 
+- [Nodejs `fs`](https://github.com/sizarcorpse/nodejs-working-with-fs-path-url/blob/main/document/fs.md)
+- [Nodejs `path`](https://github.com/sizarcorpse/nodejs-working-with-fs-path-url/blob/main/document/path.md)
+- [Nodejs `url`](https://github.com/sizarcorpse/nodejs-working-with-fs-path-url/blob/main/document/url.md)
+
 ## Terms
 
 1. **File descriptor:** A file descriptor is a non-negative integer that is used to identify an open file. It is used by the operating system to keep track of all the files that are currently open by a process. The file descriptor is used to refer to the file in subsequent read and write operations.
@@ -18,10 +22,10 @@
 
 ### Types of Streams
 
-- Writable Streams
-- Readable Streams
-- Duplex Streams
-- Transform Streams
+1. Writable Streams
+2. Readable Streams
+3. Duplex Streams
+4. Transform Streams
 
 ## Writeable Streams | `fs.createWriteStream()`,`stream.write()`
 
@@ -638,6 +642,19 @@ writableStream.on("finish", () => {
 - NEVER OVERWRITTEN THE ORIGINAL METHOD `write()` METHOD
 - NEVER CALL `_write()` OR `_writev()` DIRECTLY
 
+**options**
+
+- `highWaterMark`: The maximum number of bytes to store in the internal buffer before ceasing to read from the underlying resource. Default: `16384` (16kb).
+- `decodeStrings`: Specifies whether or not to decode strings into `Buffer` objects before passing them to `_write()`. Default: `true`.
+- `defaultEncoding`: The default character encoding to use if `decodeStrings` is set to `true`. Default: `'utf8'`.
+- `objectMode`: Specifies whether or not this stream should operate in object mode. Default: `false`.
+- `write`: A function that is called when the stream is ready to receive new data to write. Implementation for the `stream._write()` method.
+- `writev`: A function that is called when the stream is ready to receive an array of chunks of new data to write. Implementation for the `stream._writev()` method.
+- `destroy`: A function that is called when the stream is being destroyed. Implementation for the `stream._destroy()` method.
+- `final`: A function that is called when the stream is finished writing data. Implementation for the `stream._final()` method.
+- `autoDestroy`: Specifies whether or not the stream should automatically call `destroy()` after `end()` has been called. Default: `true`.
+- `emitClose`: Specifies whether or not the stream should emit a `'close'` event after `destroy()` has been called. Default: `true`.
+
 ### `Class`: `Writable`
 
 ### `constructor`
@@ -860,14 +877,6 @@ duplex streams has two internal buffers, one for the readable side and one for t
 
 there are not related to the `readable` and `writable` events.
 
-## Transform Stream
-
-Transform streams are a type of duplex streams where the output is in some way computed from the input. They implement both the `Readable` and `Writable` interfaces.
-
-## PassThrough Stream
-
-PassThrough streams are a type of duplex streams where the output is identical to the input. They implement both the `Readable` and `Writable` interfaces.
-
 ```javascript
 import fs from "fs";
 import { Duplex } from "node:stream";
@@ -963,3 +972,11 @@ duplex.on("data", (chunk) => {
   console.log(chunk.toString("utf-8"));
 });
 ```
+
+## Transform Stream
+
+Transform streams are a type of duplex streams where the output is in some way computed from the input. They implement both the `Readable` and `Writable` interfaces.
+
+## PassThrough Stream
+
+PassThrough streams are a type of duplex streams where the output is identical to the input. They implement both the `Readable` and `Writable` interfaces.
